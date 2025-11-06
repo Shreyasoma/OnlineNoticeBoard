@@ -1,0 +1,23 @@
+create table users(user_id serial primary key, name char(50) not null, email varchar(100) unique not null, password varchar(255) not null, role char(10));
+
+create table student(student_id serial primary key, user_id int references users(user_id) on delete cascade on update cascade, student_roll_no varchar(10), student_class char(20), student_department char(30), course char(30));
+                                                             
+create table teacher(teacher_id serial primary key, user_id int references users(user_id) on delete cascade on update cascade, teacher_emp_id varchar(10),teacher_department char(30), teacher_subject char(30));
+
+create table admin(admin_id serial primary key, user_id int references users(user_id) on delete cascade on update cascade, admin_department char(20));
+
+CREATE TABLE category (id SERIAL PRIMARY KEY,name VARCHAR(255) NOT NULL,color_code VARCHAR(7) NOT NULL CHECK (color_code ~ '^#([A-Fa-f0-9]{6})$'));
+
+INSERT INTO category (name, color_code) VALUES
+('Academic', '#FF5733'),
+('Sports', '#33FF57'),
+('Events', '#3357FF'),
+('Exams', '#FF33A1'),
+('Scholarship', '#FFA533');
+
+CREATE TABLE notice (notice_id SERIAL PRIMARY KEY,title VARCHAR(255),description TEXT,status VARCHAR(20) DEFAULT 'pending',date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,expiry_datetime TIMESTAMP NOT NULL,department VARCHAR(30),category_id INT REFERENCES category(id) ON DELETE CASCADE ON UPDATE CASCADE,created_by INT,attachment VARCHAR(255));
+
+CREATE TABLE archive (id SERIAL PRIMARY KEY,title VARCHAR(255) NOT NULL,description TEXT NOT NULL,n_department VARCHAR(255) NOT NULL,status VARCHAR(50) NOT NULL,date TIMESTAMP NOT NULL, expiry_datetime TIMESTAMP NOT NULL, created_by int, category_id int references category(id) on delete cascade on update cascade, attachment varchar(255));
+
+CREATE TABLE password_reset (id SERIAL PRIMARY KEY, email VARCHAR(255) NOT NULL,otp VARCHAR(6) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,expires_at TIMESTAMP NOT NULL,is_used BOOLEAN DEFAULT FALSE);
+   

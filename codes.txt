@@ -1,0 +1,2703 @@
+about.txt
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>About Us</title>
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: linear-gradient(120deg, #ff9a9e, #fad0c4);
+        color: black;
+        text-align: center;
+        margin: 0;
+        padding: 30px;
+      }
+      h2 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+      }
+      p {
+        font-size: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>About Us</h2>
+    <p>
+      The Online Notice Board is designed to simplify academic communication,
+      providing a digital platform for students, teachers, and administrators to
+      access and manage notices efficiently.
+    </p>
+  </body>
+</html>
+============================================================================================
+admin_dashboard.php
+----------<?php
+session_name('admin_session'); // Use the correct session
+session_start();
+
+if (empty($_SESSION['admin_id']) || $_SESSION['role'] !== 'admin') {
+    session_destroy();
+    header("Location: admin_login.html");
+    exit();
+}
+
+
+// Database connection
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+$conn = pg_connect("host=$host dbname=$dbname user=$username port=$port password=$password");
+
+if (!$conn) {
+    echo "<script>alert('Connection failed: " . pg_last_error() . "');</script>";
+    exit;
+}
+
+// Automatically archive expired notices
+$archive_query = "INSERT INTO archive (title, description, n_department, status, date, expiry_datetime, created_by, category_id, attachment)
+                  SELECT title, description, department, 'archived', date, expiry_datetime, created_by, category_id, attachment
+                  FROM notice WHERE expiry_datetime < now() AND status != 'archived'";
+
+$archive_result = pg_query($conn, $archive_query);
+
+if (!$archive_result) {
+    echo "<script>alert('Error archiving expired notices: " . pg_last_error($conn) . "');</script>";
+}
+
+// Update status of archived notices
+$update_status_query = "UPDATE notice SET status = 'archived' WHERE expiry_datetime < now() AND status != 'archived'";
+$update_status_result = pg_query($conn, $update_status_query);
+
+if (!$update_status_result) {
+    echo "<script>alert('Error updating notice status: " . pg_last_error($conn) . "');</script>";
+}
+
+// Handle form submission for approval or deletion of notices
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $notice_id = $_POST['notice_id'];
+    if ($_POST['action'] == 'approve') {
+        $approve_query = "UPDATE notice SET status = 'approved' WHERE notice_id = $1";
+        $result_approve = pg_query_params($conn, $approve_query, [$notice_id]);
+        if ($result_approve) {
+            echo "<script>alert('Notice approved');</script>";
+        } else {
+            echo "<script>alert('Error approving notice: " . pg_last_error($conn) . "');</script>";
+        }
+    } elseif ($_POST['action'] == 'delete') {
+        $delete_query = "UPDATE notice SET status = 'deleted' WHERE notice_id = $1";
+        $result_delete = pg_query_params($conn, $delete_query, [$notice_id]);
+        if ($result_delete) {
+            echo "<script>alert('Notice deleted');</script>";
+        } else {
+            echo "<script>alert('Error deleting notice: " . pg_last_error($conn) . "');</script>";
+        }
+    }
+    echo "<script>window.location.href = 'admin_dashboard.php';</script>";
+    exit;
+}
+
+// Fetch active notices
+$query = "SELECT n.notice_id, n.title, n.description, n.expiry_datetime, n.status, n.attachment, c.name, c.color_code 
+          FROM notice n
+          LEFT JOIN category c ON n.category_id = c.id
+          WHERE n.status != 'archived'
+          ORDER BY expiry_datetime DESC";
+
+$result = pg_query($conn, $query);
+
+if (!$result) {
+    die("Error fetching notices: " . pg_last_error($conn));
+}
+
+// Fetch archived notices
+$query_archived = "SELECT a.title, a.description, a.expiry_datetime, a.status, a.attachment, c.name, c.color_code
+                   FROM archive a
+                   LEFT JOIN category c ON a.category_id = c.id
+                   ORDER BY expiry_datetime DESC";
+
+$result_archived = pg_query($conn, $query_archived);
+
+if (!$result_archived) {
+    die("Error fetching archived notices: " . pg_last_error($conn));
+}
+
+pg_close($conn);
+?>
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Admin Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+        <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: url('https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png'), linear-gradient(120deg, #89f7fe, #66a6ff);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .navbar {
+            width: 100%;
+            background-color: #333;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .navbar h1 {
+            font-size: 1.5em;
+            margin: 0;
+        }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            background-color: #6c63ff;
+            border-radius: 5px;
+            margin-left: 10px; /* Add some spacing between buttons */
+        }
+        .navbar a:hover {
+            background-color: #5753c9;
+        }
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            margin: 30px 0;
+            padding: 30px;
+        }
+        h2 {
+            font-size: 2em;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #6c63ff;
+            color: white;
+        }
+        .btn {
+            padding: 5px 10px;
+            background-color: #6c63ff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .btn:hover {
+            background-color: #5753c9;
+        }
+        .btn-danger {
+            background-color: #f44336;
+        }
+        .btn-danger:hover {
+            background-color: #e53935;
+        }
+        .category {
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Admin Dashboard</h1>
+        <div>
+            <a href="view_notice.php">View Notices</a>
+            <a href="index.html">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+    <h2>Active Notices</h2>
+    <table>
+        <tr><th>Title</th><th>Description</th><th>Category</th><th>Expiry Date</th><th>Status</th><th>Attachment</th><th>Actions</th></tr>
+        <?php while ($row = pg_fetch_assoc($result)) { ?>
+            <tr>
+                <td><?= htmlspecialchars($row['title']) ?></td>
+                <td><?= htmlspecialchars($row['description']) ?></td>
+                <td><span class="category" style="background-color: <?= htmlspecialchars($row['color_code']) ?>;">
+                    <?= htmlspecialchars($row['name'] ?? 'No Category') ?></span></td>
+                <td><?= htmlspecialchars($row['expiry_datetime']) ?></td>
+                <td><?= htmlspecialchars($row['status']) ?></td>
+                <td>
+                    <?php if (!empty($row['attachment'])) { ?>
+                        <a href="uploads/<?= htmlspecialchars($row['attachment']) ?>" target="_blank">View</a>
+                    <?php } else { echo "No attachment"; } ?>
+                </td>
+                <td>
+                    <?php if ($row['status'] == 'pending') { ?>
+                        <form method="post" style="display:inline;">
+                            <input type="hidden" name="notice_id" value="<?= $row['notice_id'] ?>">
+                            <button type="submit" name="action" value="approve" class="btn btn-approve">Approve</button>
+                            <button type="submit" name="action" value="delete" class="btn btn-delete">Delete</button>
+                        </form>
+                    <?php } ?>
+                </td>
+            </tr>
+        <?php } ?>
+    </table>
+</div>
+
+<div class="container">
+    <h2>Archived Notices</h2>
+    <table>
+        <tr><th>Title</th><th>Description</th><th>Category</th><th>Expiry Date</th><th>Status</th><th>Attachment</th></tr>
+        <?php while ($row = pg_fetch_assoc($result_archived)) { ?>
+            <tr>
+                <td><?= htmlspecialchars($row['title']) ?></td>
+                <td><?= htmlspecialchars($row['description']) ?></td>
+                <td><span class="category" style="background-color: <?= htmlspecialchars($row['color_code']) ?>;">
+                    <?= htmlspecialchars($row['name'] ?? 'No Category') ?></span></td>
+                <td><?= htmlspecialchars($row['expiry_datetime']) ?></td>
+                <td><?= htmlspecialchars($row['status']) ?></td>
+                <td>
+                    <?php if (!empty($row['attachment'])) { ?>
+                        <a href="uploads/<?= htmlspecialchars($row['attachment']) ?>" target="_blank">View</a>
+                    <?php } else { echo "No attachment"; } ?>
+                </td>
+            </tr>
+        <?php } ?>
+    </table>
+</div>
+========================================================================================
+admin_login.html
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Page</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #89f7fe, #66a6ff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .container {
+        width: 90%;
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        text-align: center;
+      }
+      h2 {
+        font-size: 2.5em;
+        color: #333;
+      }
+      label {
+        font-weight: bold;
+        margin-top: 15px;
+        color: #333;
+        display: block;
+        text-align: left;
+      }
+      .input-container {
+        margin-top: 10px;
+        text-align: left;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        margin-top: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      input {
+        background: #f4f4f4;
+        color: #333;
+      }
+      button {
+        background: #6c63ff;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #5753c9;
+      }
+      .password-wrapper {
+        position: relative;
+      }
+      .password-wrapper input {
+        padding-right: 10px; /* Reduce padding-right to match email input size */
+      }
+      .toggle-password {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #6c63ff;
+      }
+      .forgot-password,
+      .signup-link {
+        margin-top: 20px;
+      }
+      .forgot-password a,
+      .signup-link a {
+        color: #6c63ff;
+        text-decoration: none;
+      }
+      .forgot-password a:hover,
+      .signup-link a:hover {
+        text-decoration: underline;
+      }
+    </style>
+    <script>
+      function togglePasswordVisibility(id, toggleIconId) {
+        const passwordField = document.getElementById(id);
+        const toggleIcon = document.getElementById(toggleIconId);
+        if (passwordField.type === "password") {
+          passwordField.type = "text";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/565/565655.png"; // eye-off icon
+        } else {
+          passwordField.type = "password";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/709/709612.png"; // eye icon
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Admin Login</h2>
+      <form action="admin_login.php" method="POST">
+        <div class="input-container">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="off"
+            placeholder="Enter your email"
+            required
+          />
+        </div>
+
+        <div class="input-container">
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+            />
+            <img id="toggle-password-icon" class="toggle-password"
+            onclick="togglePasswordVisibility('password',
+            'toggle-password-icon')"
+            src="https://cdn-icons-png.flaticon.com/512/709/709612.png" /* eye
+            icon */ alt="Show/Hide password" width="24px" />
+          </div>
+        </div>
+
+        <button type="submit">Login</button>
+      </form>
+
+      <div class="forgot-password">
+        <p><a href="forgot_password.php">Forgot Password?</a></p>
+      </div>
+
+      <div class="signup-link">
+        <p>Don't have an account? <a href="signup.html">Signup</a></p>
+      </div>
+    </div>
+  </body>
+</html>
+===================================================================================
+admin_login.php
+----------
+<?php
+session_destroy();
+session_name('admin_session'); // Unique session for admins
+session_start();
+
+// Database connection
+$dbhost = "localhost";
+$dbname = "postgres";
+$dbuser = "postgres";
+$dbpass = "Shreya@1410";
+$port = 5432;
+
+$conn = pg_connect("host=$dbhost dbname=$dbname user=$dbuser password=$dbpass port=$port");
+if (!$conn) {
+    die("Database connection failed.");
+}
+
+// Handle POST request
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $email = pg_escape_string($conn, $_POST['email']);
+    $password = $_POST['password']; // Password should not be escaped for verification
+
+    // Check if the user exists and is a admin
+    $query = "SELECT * FROM users WHERE email = '$email' AND role = 'admin'";
+    $result = pg_query($conn, $query);
+
+    if (pg_num_rows($result) > 0) {
+        $user = pg_fetch_assoc($result);
+
+        if (password_verify($password, $user['password'])) {
+            // Fetch admin details from admin table
+            $user_id = $user['user_id'];
+            $admin_query = "SELECT * FROM admin WHERE user_id = '$user_id'";
+            $admin_result = pg_query($conn, $admin_query);
+
+            if (pg_num_rows($admin_result) > 0) {
+                $admin = pg_fetch_assoc($admin_result);
+
+                // Store session variables
+                $_SESSION['admin_id'] = $admin['admin_id'];
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['admin_name'] = trim($user['name']); // Trim to remove extra spaces from CHAR type
+                $_SESSION['role'] = 'admin';
+
+                header("Location: admin_dashboard.php"); // Redirect after successful login
+                exit();
+            } else {
+                echo "<script>alert('admin details not found.'); window.location.href = 'admin_login.html';</script>";
+            }
+        } else {
+            echo "<script>alert('Incorrect password'); window.location.href = 'admin_login.html';</script>";
+        }
+    } else {
+        echo "<script>alert('Email not found or not a admin'); window.location.href = 'admin_login.html';</script>";
+    }
+}
+?>
+=======================================================================================
+archive_notices.php
+----------
+<?php
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+$conn = pg_connect("host=$host dbname=$dbname user=$username port=$port password=$password");
+
+if (!$conn) {
+    die("Connection failed: " . pg_last_error());
+}
+
+// Move expired notices to archive
+$query = "INSERT INTO archive (title, description, n_department, status, date, expiry_date)
+          SELECT title, description, n_department, status, date, expiry_date 
+          FROM notice 
+          WHERE expiry_date < NOW()";
+
+$result = pg_query($conn, $query);
+
+if ($result) {
+    // Delete expired notices from notice table
+    pg_query($conn, "DELETE FROM notice WHERE expiry_date < NOW()");
+}
+
+pg_close($conn);
+?>
+====================================================================================
+check_otp.php
+----------
+<?php
+session_start();
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $entered_otp = $_POST['otp'];
+
+    // Check if OTP is expired
+    if (time() > $_SESSION['otp_expiry']) {
+        unset($_SESSION['otp']); // Remove expired OTP
+        unset($_SESSION['otp_expiry']);
+        echo "<script>alert('OTP has expired. Please request a new one.'); window.location.href = 'forget_password.html';</script>";
+        exit();
+    }
+
+    // Validate OTP
+    if ($entered_otp == $_SESSION['otp']) {
+        echo "<script>alert('OTP verified successfully!'); window.location.href = 'reset_password.php';</script>";
+    } else {
+        echo "<script>alert('Invalid OTP. Please try again.'); window.location.href = 'verify_otp.php';</script>";
+    }
+}
+?>
+====================================================================================
+contact.html
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact Us</title>
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: linear-gradient(120deg, #f093fb, #f5576c);
+        color: white;
+        text-align: center;
+        margin: 0;
+        padding: 30px;
+      }
+      h2 {
+        font-size: 2.5em;
+        margin-bottom: 10px;
+      }
+      p {
+        font-size: 1.2em;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Contact Us</h2>
+    <p>Email: support@noticesystem.com</p>
+    <p>Phone: +91 12345 67890</p>
+    <p>Address: XYZ College, Mulshi, Maharashtra, India</p>
+  </body>
+</html>
+================================================================================
+create_notice.php
+-----------
+<?php
+session_start();
+
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'teacher') {
+    header("Location: teacher_login.php");
+    exit;
+}
+
+// Database connection
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+
+$conn = pg_connect("host=$host dbname=$dbname user=$username password=$password port=$port");
+
+if (!$conn) {
+    die("Database connection failed: " . pg_last_error());
+}
+
+// Handle form submission
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $title = $_POST['title'];
+    $description = $_POST['description'];
+    $expiry_datetime = $_POST['expiry_datetime'];
+    $category_id = $_POST['category'];
+    $department = $_POST['department'];
+    $created_by = $_SESSION['user_id'];
+    $status = 'pending';
+
+    // Insert notice
+    $query = "INSERT INTO notice (title, description, status, date, expiry_datetime, category_id, department, created_by) 
+              VALUES ($1, $2, $3, NOW(), $4, $5, $6, $7)";
+    $result = pg_query_params($conn, $query, [$title, $description, $status, $expiry_datetime, $category_id, $department, $created_by]);
+
+    if ($result) {
+        echo "<script>alert('Notice created successfully!'); window.location.href = 'teacher_dashboard.php';</script>";
+    } else {
+        echo "<script>alert('Error creating notice: " . pg_last_error() . "');</script>";
+    }
+}
+
+// Fetch categories for dropdown
+$category_query = "SELECT id, name FROM category";
+$category_result = pg_query($conn, $category_query);
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Create Notice</title>
+</head>
+<body>
+    <h2>Create Notice</h2>
+    <form action="create_notice.php" method="POST">
+        <label>Title:</label>
+        <input type="text" name="title" required>
+
+        <label>Description:</label>
+        <textarea name="description" required></textarea>
+
+        <label>Expiry Date and Time:</label>
+        <input type="datetime-local" name="expiry_datetime" required>
+
+        <label>Category:</label>
+        <select name="category" required>
+            <option value="">--Select Category--</option>
+            <?php while ($category = pg_fetch_assoc($category_result)) { ?>
+                <option value="<?php echo $category['id']; ?>"><?php echo $category['name']; ?></option>
+            <?php } ?>
+        </select>
+
+        <label>Department:</label>
+        <input type="text" name="department" required>
+
+        <button type="submit">Create Notice</button>
+    </form>
+</body>
+</html>
+==========================================================================================
+forgot_password.php
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Forget Password</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #89f7fe, #66a6ff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .container {
+        width: 90%;
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        text-align: center;
+      }
+      h2 {
+        font-size: 2.5em;
+        color: #333;
+      }
+      label {
+        font-weight: bold;
+        margin-top: 15px;
+        color: #333;
+        display: block;
+        text-align: left;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        margin-top: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      input {
+        background: #f4f4f4;
+        color: #333;
+      }
+      button {
+        background: #6c63ff;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #5753c9;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Forget Password</h2>
+      <form action="send_otp.php" method="POST">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" autocomplete="off" placeholder="Enter your email" required />
+        <button type="submit">Submit</button>
+      </form>
+    </div>
+  </body>
+</html>
+======================================================================================
+index.html
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Online Notice Board</title>
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #89f7fe, #66a6ff);
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 30px;
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      }
+      header nav {
+        display: flex;
+        gap: 15px;
+      }
+      header .login {
+        display: flex;
+        align-items: center;
+      }
+      header select {
+        padding: 15px;
+        font-size: 18px; /* Increased font size */
+        border-radius: 8px;
+        border: none;
+        background: #f4f4f4;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 30px;
+      }
+      .content {
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+      }
+      h2 {
+        font-size: 2.5em;
+        color: #333;
+        margin-bottom: 10px;
+      }
+      p {
+        font-size: 1.2em;
+        color: #666;
+      }
+      footer {
+        text-align: center;
+        background-color: black;
+        color: white;
+        padding: 10px 0;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href="about.html">About Us</a>
+        <a href="contact.html">Contact Us</a>
+      </nav>
+      <div class="login">
+        <label for="role">Login as:</label>
+        <select id="role" onchange="navigateToLogin()">
+          <option value="" disabled selected>Select</option>
+          <option value="student">Student</option>
+          <option value="teacher">Teacher</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+    </header>
+
+    <main>
+      <div class="content">
+        <h2>Online Notice Board</h2>
+        <p>Stay updated with the latest academic and event notices.</p>
+      </div>
+    </main>
+
+    <footer>
+      <p>© 2025 Online Notice Board. All rights reserved.</p>
+      <p>Created by SSP</p>
+    </footer>
+
+    <script>
+      function navigateToLogin() {
+        const role = document.getElementById("role").value;
+        if (role === "student") {
+          window.location.href = "student_login.html";
+        } else if (role === "teacher") {
+          window.location.href = "teacher_login.html";
+        } else if (role === "admin") {
+          window.location.href = "admin_login.html";
+        }
+      }
+    </script>
+  </body>
+</html>
+======================================================================================
+reset_password.php
+-----------
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset Password</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      font-family: "Montserrat", sans-serif;
+      background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+        linear-gradient(120deg, #89f7fe, #66a6ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      width: 90%;
+      max-width: 600px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      text-align: center;
+    }
+    h2 {
+      font-size: 2.5em;
+      color: #333;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 15px;
+      color: #333;
+      display: block;
+      text-align: left;
+    }
+    input,
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      margin-top: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    input {
+      background: #f4f4f4;
+      color: #333;
+    }
+    button {
+      background: #6c63ff;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #5753c9;
+    }
+    .toggle-link {
+      cursor: pointer;
+      color: #6c63ff;
+      font-size: 14px;
+      text-decoration: underline;
+    }
+  </style>
+  <script>
+    function togglePasswordVisibility(id, toggleLinkId) {
+      const passwordField = document.getElementById(id);
+      const toggleLink = document.getElementById(toggleLinkId);
+      if (passwordField.type === "password") {
+        passwordField.type = "text";
+        toggleLink.textContent = "Hide";
+      } else {
+        passwordField.type = "password";
+        toggleLink.textContent = "Show";
+      }
+    }
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h2>Reset Password</h2>
+    <form action="update_password.php" method="POST">
+      <label for="new_password">Enter New Password:</label>
+      <div class="password-container">
+        <input
+          type="password"
+          id="new_password"
+          name="new_password"
+          placeholder="Enter your password"
+          required
+        />
+        <span
+          id="toggle-password"
+          class="toggle-link"
+          onclick="togglePasswordVisibility('new_password', 'toggle-password')"
+          >Show</span
+        >
+      </div>
+
+      <label for="confirm_password">Confirm Password</label>
+      <div class="password-container">
+        <input
+          type="password"
+          id="confirm_password"
+          name="confirm_password"
+          placeholder="Re-enter your password"
+          required
+        />
+        <span
+          id="toggle-confirm-password"
+          class="toggle-link"
+          onclick="togglePasswordVisibility('confirm_password', 'toggle-confirm-password')"
+          >Show</span
+        >
+      </div>
+      
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+</body>
+</html>
+=======================================================================================
+send_otp.php
+----------
+<?php
+session_start();
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+
+// Connect to the PostgreSQL database
+$conn = pg_connect("host=$host dbname=$dbname user=$username password=$password port=$port");
+
+if (!$conn) {
+    die("Database connection failed: " . pg_last_error());
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $email = pg_escape_string($_POST['email']);
+
+    // Check if the email exists in the database
+    $query = "SELECT * FROM users WHERE email = '$email'";
+    $result = pg_query($conn, $query);
+
+    if (pg_num_rows($result) > 0) {
+        // Generate a random 6-digit OTP
+        $otp = rand(100000, 999999);
+        $_SESSION['otp'] = $otp;
+        $_SESSION['otp_expiry'] = time() + (5 * 60); // Current time + 5 minutes
+        $_SESSION['email'] = $email;
+
+        // Send OTP to user's email
+        $subject = "Password Reset OTP";
+        $message = "Your OTP for resetting the password is: $otp\nThis OTP is valid for 5 minutes.";
+        $headers = "From: noreply@example.com";
+
+        if (mail($email, $subject, $message, $headers)) {
+            echo "<script>alert('OTP sent successfully!'); window.location.href = 'verify_otp.php';</script>";
+        } else {
+            echo "<script>alert('Failed to send OTP. Please try again.'); window.location.href = 'forget_password.html';</script>";
+        }
+    } else {
+        echo "<script>alert('Email not found. Please try again.'); window.location.href = 'forget_password.html';</script>";
+    }
+}
+?>
+=========================================================================================
+signup.html
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Online Notice Board - Signup</title>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css"
+    />
+
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #a1c4fd, #c2e9fb);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .container {
+        width: 90%;
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        text-align: center;
+      }
+      h1 {
+        font-size: 2.5em;
+        color: #333;
+      }
+      label {
+        font-weight: bold;
+        margin-top: 15px;
+        color: #333;
+        display: block;
+        text-align: left;
+      }
+      .input-container {
+        margin-top: 10px;
+        text-align: left;
+      }
+      input,
+      select,
+      button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        margin-top: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      input,
+      select {
+        background: #f4f4f4;
+        color: #333;
+      }
+      button {
+        background: #6c63ff;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #5753c9;
+      }
+      .role-specific {
+        display: none;
+      }
+      .login-link,
+      .forgot-password {
+        margin-top: 20px;
+      }
+      .login-link a,
+      .forgot-password a {
+        color: #6c63ff;
+        text-decoration: none;
+      }
+      .login-link a:hover,
+      .forgot-password a:hover {
+        text-decoration: underline;
+      }
+      .password-container {
+        position: relative;
+        margin-top: 10px;
+      }
+      .password-container input {
+        padding-right: 10px;
+      }
+      .toggle-link {
+        position: absolute;
+        right: 13px;
+        top: 50%;
+        transform: translateY(-1%);
+        cursor: pointer;
+        color: #6c63ff;
+      }
+      .toggle-link i {
+        font-size: 1.2em;
+      }
+      .strength {
+        text-align: right;
+        font-size: 12px;
+        color: #ff6b6b;
+        margin-top: -10px;
+      }
+    </style>
+
+    <script>
+      function toggleFields() {
+        const role = document.getElementById("role").value;
+        document.querySelectorAll(".role-specific").forEach((section) => {
+          section.style.display = "none";
+        });
+        if (role) {
+          document.getElementById(role + "-fields").style.display = "block";
+        }
+      }
+
+      function validateForm(event) {
+        const password = document.getElementById("password").value;
+        const confirmPassword =
+          document.getElementById("confirm_password").value;
+        if (password !== confirmPassword) {
+          alert("Passwords do not match. Please try again.");
+          event.preventDefault();
+        }
+      }
+
+      function togglePasswordVisibility(id, toggleLinkId) {
+        const passwordField = document.getElementById(id);
+        const toggleLink = document
+          .getElementById(toggleLinkId)
+          .querySelector("i");
+
+        if (passwordField.type === "password") {
+          passwordField.type = "text";
+          toggleLink.classList.remove("fa-eye");
+          toggleLink.classList.add("fa-eye-slash");
+        } else {
+          passwordField.type = "password";
+          toggleLink.classList.remove("fa-eye-slash");
+          toggleLink.classList.add("fa-eye");
+        }
+      }
+
+      function checkPasswordStrength() {
+        const password = document.getElementById("password").value;
+        const strength = document.getElementById("strength");
+        const strongPassword = new RegExp(
+          "^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#\\$%\\^&\\*])(?=.{8,})"
+        );
+        if (strongPassword.test(password)) {
+          strength.textContent = "Strong";
+          strength.style.color = "#28a745";
+        } else {
+          strength.textContent = "Weak";
+          strength.style.color = "#ff6b6b";
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Signup Page</h1>
+      <form action="signup.php" method="POST" onsubmit="validateForm(event)">
+        <div class="input-container">
+          <label for="name">Name</label>
+          <input
+            type="text"
+            id="name"
+            name="name"
+            autocomplete="off"
+            placeholder="Enter your name"
+            required
+          />
+        </div>
+
+        <div class="input-container">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="off"
+            placeholder="Enter your email"
+            required
+          />
+        </div>
+
+        <div class="password-container">
+          <label for="email">Password</label>
+          <input
+            type="password"
+            id="password"
+            name="password"
+            placeholder="Enter your password"
+            required
+            oninput="checkPasswordStrength()"
+          />
+          <span
+            id="toggle-password"
+            class="toggle-link"
+            onclick="togglePasswordVisibility('password', 'toggle-password')"
+          >
+            <i class="fas fa-eye"></i>
+          </span>
+        </div>
+        <div id="strength" class="strength"></div>
+
+        <div class="password-container">
+          <label for="email">Confirm Password</label>
+          <input
+            type="password"
+            id="confirm_password"
+            name="confirm_password"
+            placeholder="Re-enter your password"
+            required
+          />
+          <span
+            id="toggle-confirm-password"
+            class="toggle-link"
+            onclick="togglePasswordVisibility('confirm_password', 'toggle-confirm-password')"
+          >
+            <i class="fas fa-eye"></i>
+          </span>
+        </div>
+
+        <div class="input-container">
+          <label for="role">Role</label>
+          <select id="role" name="role" onchange="toggleFields()" required>
+            <option value="">-- Select Role --</option>
+            <option value="student">Student</option>
+            <option value="teacher">Teacher</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
+        <!-- Student Fields -->
+        <div id="student-fields" class="role-specific">
+          <div class="input-container">
+            <label for="student_roll_no">Roll Number</label>
+            <input
+              type="text"
+              id="student_roll_no"
+              name="student_roll_no"
+              autocomplete="off"
+              placeholder="Enter your roll number"
+            />
+          </div>
+          <div class="input-container">
+            <label for="student_class">Class</label>
+            <select id="student_class" name="student_class">
+              <option value="">-- Select Class --</option>
+              <option value="fy">First Year</option>
+              <option value="sy">Second Year</option>
+              <option value="ty">Third Year</option>
+              <!-- Add more classes as needed -->
+            </select>
+          </div>
+          <div class="input-container">
+            <label for="student_department">Department</label>
+            <select id="student_department" name="student_department">
+              <option value="">-- Select Department --</option>
+              <option value="Animation">Animation</option>
+              <option value="Biotechnology">Biotechnology</option>
+              <option value="Chemistry">Chemistry</option>
+              <option value="ComputerScience">Computer Science</option>
+              <option value="Commerce">Commerce</option>
+              <option value="ElectronicScience">Electronic Science</option>
+              <option value="English">English</option>
+              <option value="German">German</option>
+              <option value="Mathematics">Mathematics</option>
+              <option value="Marathi">Marathi</option>
+              <option value="Physics">Physics</option>
+              <option value="Statistics">Statistics</option>
+              <option value="Zoology">Zoology</option>
+              <!-- Add more departments as needed -->
+            </select>
+          </div>
+          <div class="input-container">
+            <label for="course">Course</label>
+            <select id="course" name="course">
+              <option value="">-- Select Course --</option>
+              <option value="FYBA">FYBA</option>
+              <option value="SYBA">SYBA</option>
+              <option value="TYBA">TYBA</option>
+              <option value="FYBSc">FYBSc</option>
+              <option value="SYBSc">SYBSc</option>
+              <option value="TYBSc">TYBSc</option>
+              <option value="FYBCA">FYBCA</option>
+              <option value="SYBCA">SYBCA</option>
+              <option value="TYBCA">TYBCA</option>
+              <option value="FYBCS">FYBCS</option>
+              <option value="SYBCS">SYBCS</option>
+              <option value="TYBCS">TYBCS</option>
+              <!-- Add more courses as needed -->
+            </select>
+          </div>
+        </div>
+
+        <!-- Teacher Fields -->
+        <div id="teacher-fields" class="role-specific">
+          <div class="input-container">
+            <label for="teacher_emp_id">Employee ID</label>
+            <input
+              type="text"
+              id="teacher_emp_id"
+              name="teacher_emp_id"
+              autocomplete="off"
+              placeholder="Enter your employee ID"
+            />
+          </div>
+          <div class="input-container">
+            <label for="teacher_subject">Subject</label>
+            <select id="teacher_subject" name="teacher_subject">
+              <option value="">-- Select Subject --</option>
+              <option value="C">C</option>
+              <option value="Cpp">Cpp</option>
+              <option value="Discrete Mathematics">Discrete Mathematics</option>
+              <option value="Linear Algebra">Linear Algebra</option>
+              <option value="Graph Theory">Graph Theory</option>
+              <option value="DS">DS</option>
+              <option value="ADS">ADS</option>
+              <option value="RDBMS">RDBMS</option>
+              <option value="Computational Geometry">
+                Computational Geometry
+              </option>
+              <option value="Statistics">Statistics</option>
+              <option value="Java">Java</option>
+              <option value="System Programming">System Programming</option>
+              <option value="Operating System">Operating System</option>
+              <option value="Networking">Networking</option>
+              <option value="Web Programming">Web Programming</option>
+              <option value="TCS">TCS</option>
+              <option value="CC">CC</option>
+            </select>
+          </div>
+          <div class="input-container">
+            <label for="teacher_department">Department</label>
+            <select id="teacher_department" name="teacher_department">
+              <option value="">-- Select Department --</option>
+              <option value="Animation">Animation</option>
+              <option value="Biotechnology">Biotechnology</option>
+              <option value="Chemistry">Chemistry</option>
+              <option value="ComputerScience">Computer Science</option>
+              <option value="Commerce">Commerce</option>
+              <option value="ElectronicScience">Electronic Science</option>
+              <option value="English">English</option>
+              <option value="German">German</option>
+              <option value="Mathematics">Mathematics</option>
+              <option value="Marathi">Marathi</option>
+              <option value="Physics">Physics</option>
+              <option value="Statistics">Statistics</option>
+              <option value="Zoology">Zoology</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Admin Fields -->
+        <div id="admin-fields" class="role-specific">
+          <div class="input-container">
+            <label for="admin_department">Department</label>
+            <input
+              type="text"
+              id="admin_department"
+              name="admin_department"
+              autocomplete="off"
+              placeholder="Enter your department (optional)"
+            />
+          </div>
+        </div>
+
+        <button type="submit">Signup</button>
+      </form>
+
+      <div class="forgot-password">
+        <p><a href="forgot_password.php">Forgot Password?</a></p>
+      </div>
+
+      <div class="login-link">
+        <p>Already a user? <a href="login.html">Login</a></p>
+      </div>
+    </div>
+  </body>
+</html>
+========================================================================================
+signup.php
+----------
+<?php
+// Database connection details
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+
+// Connect to the PostgreSQL database
+$conn = pg_connect("host=$host dbname=$dbname user=$username password=$password port=$port");
+
+if (!$conn) {
+    die("Database connection failed: " . pg_last_error());
+}
+
+// Check if the request method is POST
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    // Capture form data
+    $name = $_POST['name'];
+    $email = $_POST['email'];
+    $password = $_POST['password']; // Get the raw password
+    $confirm_password = $_POST['confirm_password']; // Get the confirm password field
+    $role = $_POST['role'];
+
+    // Check if the passwords match
+    if ($password !== $confirm_password) {
+        echo "Error: Passwords do not match.";
+    } else {
+        // Hash the password securely
+        $hashed_password = password_hash($password, PASSWORD_BCRYPT);
+
+        // Begin transaction
+        pg_query($conn, "BEGIN");
+
+        try {
+            // Insert into the `users` table (NO confirm_password field needed in the database)
+            $query = "INSERT INTO users (name, email, password, role) VALUES ($1, $2, $3, $4) RETURNING user_id";
+            $result = pg_query_params($conn, $query, [$name, $email, $hashed_password, $role]);
+
+            if (!$result) {
+                throw new Exception("Error inserting into users table: " . pg_last_error($conn));
+            }
+
+            // Get the last inserted user ID
+            $row = pg_fetch_assoc($result);
+            $userId = $row['user_id'];
+
+            // Add role-specific data based on the role selected
+            if ($role == 'student') {
+                $student_roll_no = $_POST['student_roll_no'];
+                $student_class = $_POST['student_class'];
+                $student_department = $_POST['student_department'];
+                $student_course = $_POST['course'];
+
+                // Ensure roll_no and department are not empty before inserting
+                if (!empty($student_roll_no) && !empty($student_department)) {
+                    $query_student = "INSERT INTO student (user_id, student_roll_no, student_class, student_department, course) VALUES ($1, $2, $3, $4, $5)";
+                    $result = pg_query_params($conn, $query_student, [$userId, $student_roll_no, $student_class, $student_department, $student_course]);
+
+                    if (!$result) {
+                        throw new Exception("Error inserting into student table: " . pg_last_error($conn));
+                    }
+                } else {
+                    throw new Exception("Error: roll_no and department cannot be empty for students.");
+                }
+            } elseif ($role == 'teacher') {
+                $teacher_emp_id = $_POST['teacher_emp_id'];
+                $teacher_subject = $_POST['teacher_subject'];
+                $teacher_department = $_POST['teacher_department'];
+
+                // Ensure roll_no and department are not empty before inserting
+                if (!empty($teacher_emp_id) && !empty($teacher_department)) {
+                    $query_teacher = "INSERT INTO teacher (user_id, teacher_emp_id, teacher_subject, teacher_department) VALUES ($1, $2, $3, $4)";
+                    $result = pg_query_params($conn, $query_teacher, [$userId, $teacher_emp_id, $teacher_subject, $teacher_department]);
+
+                    if (!$result) {
+                        throw new Exception("Error inserting into teacher table: " . pg_last_error($conn));
+                    }
+                } else {
+                    throw new Exception("Error: roll_no and department cannot be empty for teachers.");
+                }
+            } elseif ($role == 'admin') {
+                //$admin_username = $_POST['admin_username'];
+                $admin_department = $_POST['admin_department'];
+
+                // Insert admin data
+                $query_admin = "INSERT INTO admin (user_id, admin_department) VALUES ($1, $2)";
+                $result = pg_query_params($conn, $query_admin, [$userId, $admin_department]);
+
+                if (!$result) {
+                    throw new Exception("Error inserting into admin table: " . pg_last_error($conn));
+                }
+            }
+
+            // Commit the transaction
+            pg_query($conn, "COMMIT");
+
+            // Redirect to login page after successful signup
+            header("Location: login.html");
+            exit;
+
+        } catch (Exception $e) {
+            // Rollback in case of an error
+            pg_query($conn, "ROLLBACK");
+            echo "Error: " . $e->getMessage();
+        }
+    }
+}
+
+// Close the connection
+pg_close($conn);
+?>
+======================================================================================
+student_dashboard.php
+----------
+<?php
+session_name('student_session'); // Ensure session consistency
+session_start();
+
+// Check if student_id exists instead of role
+if (!isset($_SESSION['student_id'])) {
+    echo "<script>alert('You must be logged in as a student to access this page.'); window.location.href = 'student_login.html';</script>";
+    exit;
+}
+
+// Database connection
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+
+$conn = pg_connect("host=$host dbname=$dbname user=$username port=$port password=$password");
+
+if (!$conn) {
+    echo "<script>alert('Database connection failed!');</script>";
+    exit;
+}
+
+// Fetch all approved notices, excluding expired ones
+$query = "
+    SELECT notice.*, category.name AS category_name, category.color_code AS category_color
+    FROM notice 
+    LEFT JOIN category ON notice.category_id = category.id 
+    WHERE notice.status = 'approved' 
+      AND notice.expiry_datetime >= NOW() 
+    ORDER BY notice.date DESC";
+
+$result = pg_query($conn, $query);
+
+if (!$result) {
+    echo "<script>alert('Error fetching notices.');</script>";
+    exit;
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: url('https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png'), linear-gradient(120deg, #f6d365, #fda085);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .navbar {
+            width: 100%;
+            background-color: #333;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            font-size: 1.5em;
+            margin: 0;
+        }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            background-color: #6c63ff;
+            border-radius: 5px;
+            margin-left: 10px;
+        }
+        .navbar a:hover {
+            background-color: #5753c9;
+        }
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            margin: 30px 0;
+            padding: 30px;
+        }
+        h2 {
+            font-size: 2em;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #6c63ff;
+            color: white;
+            text-align: center;
+        }
+        td {
+            text-align: center;
+        }
+        .category {
+            font-weight: bold;
+            padding: 5px;
+            color: white;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Student Dashboard</h1>
+        <div>
+            <a href="view_notice.php">View Notices</a>
+            <a href="index.html">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>All Notices</h2>
+        <table>
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Date</th>
+                <th>Expiry Date</th>
+                <th>Category</th>
+                <th>Attachment</th>
+            </tr>
+            <?php if (pg_num_rows($result) > 0) { ?>
+                <?php while ($row = pg_fetch_assoc($result)) { ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['title']); ?></td>
+                        <td><?php echo htmlspecialchars($row['description']); ?></td>
+                        <td><?php echo htmlspecialchars($row['date']); ?></td>
+                        <td><?php echo htmlspecialchars($row['expiry_datetime']); ?></td>
+                        <td>
+                            <span class="category" style="background-color: <?php echo htmlspecialchars($row['category_color']); ?>;">
+                                <?php echo isset($row['category_name']) ? htmlspecialchars($row['category_name']) : 'No Category'; ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if (!empty($row['attachment'])) { ?>
+                                <a href="view_attachment.php?file=<?php echo htmlspecialchars($row['attachment']); ?>" target="_blank">View Attachment</a>
+                            <?php } else { ?>
+                                No attachment
+                            <?php } ?>
+                        </td>
+                    </tr>
+                <?php } ?>
+            <?php } else { ?>
+                <tr>
+                    <td colspan="6">No notices available.</td>
+                </tr>
+            <?php } ?>
+        </table>
+    </div>
+</body>
+</html>
+
+<?php
+// Close PostgreSQL connection at the end
+pg_close($conn);
+?>
+=========================================================================================
+student_login.html
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Page</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #89f7fe, #66a6ff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .container {
+        width: 90%;
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        text-align: center;
+      }
+      h2 {
+        font-size: 2.5em;
+        color: #333;
+      }
+      label {
+        font-weight: bold;
+        margin-top: 15px;
+        color: #333;
+        display: block;
+        text-align: left;
+      }
+      .input-container {
+        margin-top: 10px;
+        text-align: left;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        margin-top: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      input {
+        background: #f4f4f4;
+        color: #333;
+      }
+      button {
+        background: #6c63ff;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #5753c9;
+      }
+      .password-wrapper {
+        position: relative;
+      }
+      .password-wrapper input {
+        padding-right: 10px; /* Reduce padding-right to match email input size */
+      }
+      .toggle-password {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #6c63ff;
+      }
+      .forgot-password,
+      .signup-link {
+        margin-top: 20px;
+      }
+      .forgot-password a,
+      .signup-link a {
+        color: #6c63ff;
+        text-decoration: none;
+      }
+      .forgot-password a:hover,
+      .signup-link a:hover {
+        text-decoration: underline;
+      }
+    </style>
+    <script>
+      function togglePasswordVisibility(id, toggleIconId) {
+        const passwordField = document.getElementById(id);
+        const toggleIcon = document.getElementById(toggleIconId);
+        if (passwordField.type === "password") {
+          passwordField.type = "text";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/565/565655.png"; // eye-off icon
+        } else {
+          passwordField.type = "password";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/709/709612.png"; // eye icon
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Student Login</h2>
+      <form action="student_login.php" method="POST">
+        <div class="input-container">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="off"
+            placeholder="Enter your email"
+            required
+          />
+        </div>
+
+        <div class="input-container">
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+            />
+            <img id="toggle-password-icon" class="toggle-password"
+            onclick="togglePasswordVisibility('password',
+            'toggle-password-icon')"
+            src="https://cdn-icons-png.flaticon.com/512/709/709612.png" /* eye
+            icon */ alt="Show/Hide password" width="24px" />
+          </div>
+        </div>
+
+        <button type="submit">Login</button>
+      </form>
+
+      <div class="forgot-password">
+        <p><a href="forgot_password.php">Forgot Password?</a></p>
+      </div>
+
+      <div class="signup-link">
+        <p>Don't have an account? <a href="signup.html">Signup</a></p>
+      </div>
+    </div>
+  </body>
+</html>
+=========================================================================================
+student_login.php
+----------
+<?php
+session_name('student_session'); // Unique session for students
+session_start();
+
+// Database connection
+$dbhost = "localhost";
+$dbname = "postgres";
+$dbuser = "postgres";
+$dbpass = "Shreya@1410";
+$port = 5432;
+
+$conn = pg_connect("host=$dbhost dbname=$dbname user=$dbuser password=$dbpass port=$port");
+if (!$conn) {
+    die("Database connection failed.");
+}
+
+// Handle POST request
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $email = pg_escape_string($conn, $_POST['email']);
+    $password = $_POST['password']; // Password should not be escaped for verification
+
+    // Check if the user exists and is a student
+    $query = "SELECT * FROM users WHERE email = '$email' AND role = 'student'";
+    $result = pg_query($conn, $query);
+
+    if (pg_num_rows($result) > 0) {
+        $user = pg_fetch_assoc($result);
+
+        if (password_verify($password, $user['password'])) {
+            // Fetch student details from student table
+            $user_id = $user['user_id'];
+            $student_query = "SELECT * FROM student WHERE user_id = '$user_id'";
+            $student_result = pg_query($conn, $student_query);
+
+            if (pg_num_rows($student_result) > 0) {
+                $student = pg_fetch_assoc($student_result);
+
+                // Store session variables
+                $_SESSION['student_id'] = $student['student_id'];
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['student_name'] = trim($user['name']); // Trim to remove extra spaces from CHAR type
+
+                header("Location: student_dashboard.php"); // Redirect after successful login
+                exit();
+            } else {
+                echo "<script>alert('Student details not found.'); window.location.href = 'student_login.html';</script>";
+            }
+        } else {
+            echo "<script>alert('Incorrect password'); window.location.href = 'student_login.html';</script>";
+        }
+    } else {
+        echo "<script>alert('Email not found or not a student'); window.location.href = 'student_login.html';</script>";
+    }
+}
+?>
+========================================================================================
+teacher_dashboard.php
+----------
+<?php
+session_name('teacher_session'); // Use the correct session
+// Start session and check if the user is logged in as a teacher
+session_start();
+
+if (!isset($_SESSION['teacher_id'])) {
+    echo "<script>alert('You must be logged in as a teacher to access this page.'); window.location.href = 'teacher_login.html';</script>";
+    exit;
+}
+
+// Database connection
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+$conn = pg_connect("host=$host dbname=$dbname user=$username port=$port password=$password");
+
+if (!$conn) {
+    die("Connection failed: " . pg_last_error());
+}
+
+// Handle form submission for deletion of notices
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && $_POST['action'] == 'delete') {
+    $notice_id = $_POST['notice_id'];
+    $delete_query = "DELETE FROM notice WHERE notice_id = $1";
+    pg_query_params($conn, $delete_query, [$notice_id]);
+    header("Location: teacher_dashboard.php");
+    exit;
+}
+
+// Fetch only active (non-expired) notices for teachers
+$query = "
+    SELECT notice.*, category.name AS category_name, category.color_code AS category_color
+    FROM notice 
+    LEFT JOIN category ON notice.category_id = category.id 
+    WHERE expiry_datetime >= NOW()  -- Only fetch active notices
+    ORDER BY notice.date DESC";
+$result = pg_query($conn, $query);
+
+pg_close($conn); // Close the database connection
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background: url('https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png'), linear-gradient(120deg, #84fab0, #8fd3f4);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .navbar {
+            width: 100%;
+            background-color: #333;
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .navbar h1 {
+            font-size: 1.5em;
+            margin: 0;
+        }
+        .navbar a {
+            color: white;
+            text-decoration: none;
+            padding: 10px 15px;
+            background-color: #6c63ff;
+            border-radius: 5px;
+            margin-left: 10px; /* Add some spacing between buttons */
+        }
+        .navbar a:hover {
+            background-color: #5753c9;
+        }
+        .create-section {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        .btn-create {
+            padding: 10px 20px;
+            background-color: #ff5733;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s ease;
+        }
+        .btn-create:hover {
+            background-color: #c70039;
+        }
+        .container {
+            width: 90%;
+            max-width: 1000px;
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+            margin: 30px 0;
+            padding: 30px;
+        }
+        h2 {
+            font-size: 2em;
+            color: #333;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        th {
+            background-color: #6c63ff;
+            color: white;
+        }
+        .category {
+            font-weight: bold;
+            padding: 5px;
+            color: white;
+            border-radius: 4px;
+        }
+        .btn {
+            padding: 5px 10px;
+            background-color: #f44336;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .btn:hover {
+            background-color: #e53935;
+        }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>Teacher Dashboard</h1>
+        <div>
+            <a href="view_notice.php">View Notices</a>
+            <a href="index.html" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <div class="create-section">
+        <a href="create_notice.php" class="btn-create">Create Notice</a>
+    </div>
+
+    <div class="container">
+        <h2>Manage Notices</h2>
+        <table>
+            <tr>
+                <th>Title</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>Expiry Date</th>
+                <th>Status</th>
+                <th>Attachment</th>
+                <th>Actions</th>
+            </tr>
+            <?php while ($row = pg_fetch_assoc($result)) { ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($row['title']); ?></td>
+                    <td><?php echo htmlspecialchars($row['description']); ?></td>
+                    <td>
+                        <span class="category" style="background-color: <?php echo htmlspecialchars($row['category_color']); ?>;">
+                            <?php echo isset($row['category_name']) ? htmlspecialchars($row['category_name']) : 'No Category'; ?>
+                        </span>
+                    </td>
+                    <td><?php echo htmlspecialchars($row['expiry_datetime']); ?></td>
+                    <td><?php echo htmlspecialchars($row['status']); ?></td>
+                    <td>
+                        <?php if (!empty($row['attachment'])) { ?>
+                            <a href="view_attachment.php?file=<?php echo htmlspecialchars($row['attachment']); ?>" target="_blank">View</a>
+                        <?php } else { ?>
+                            No attachment
+                        <?php } ?>
+                    </td>
+                    <td>
+                        <form method="post" style="display:inline;">
+                            <input type="hidden" name="notice_id" value="<?php echo $row['notice_id']; ?>">
+                            <button type="submit" name="action" value="delete" class="btn">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php } ?>
+        </table>
+    </div>
+</body>
+</html>
+=====================================================================================
+teacher_login.html
+----------
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Page</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #89f7fe, #66a6ff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .container {
+        width: 90%;
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        text-align: center;
+      }
+      h2 {
+        font-size: 2.5em;
+        color: #333;
+      }
+      label {
+        font-weight: bold;
+        margin-top: 15px;
+        color: #333;
+        display: block;
+        text-align: left;
+      }
+      .input-container {
+        margin-top: 10px;
+        text-align: left;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        margin-top: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      input {
+        background: #f4f4f4;
+        color: #333;
+      }
+      button {
+        background: #6c63ff;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #5753c9;
+      }
+      .password-wrapper {
+        position: relative;
+      }
+      .password-wrapper input {
+        padding-right: 10px; /* Reduce padding-right to match email input size */
+      }
+      .toggle-password {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #6c63ff;
+      }
+      .forgot-password,
+      .signup-link {
+        margin-top: 20px;
+      }
+      .forgot-password a,
+      .signup-link a {
+        color: #6c63ff;
+        text-decoration: none;
+      }
+      .forgot-password a:hover,
+      .signup-link a:hover {
+        text-decoration: underline;
+      }
+    </style>
+    <script>
+      function togglePasswordVisibility(id, toggleIconId) {
+        const passwordField = document.getElementById(id);
+        const toggleIcon = document.getElementById(toggleIconId);
+        if (passwordField.type === "password") {
+          passwordField.type = "text";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/565/565655.png"; // eye-off icon
+        } else {
+          passwordField.type = "password";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/709/709612.png"; // eye icon
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Teacher Login</h2>
+      <form action="teacher_login.php" method="POST">
+        <div class="input-container">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="off"
+            placeholder="Enter your email"
+            required
+          />
+        </div>
+
+        <div class="input-container">
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+            />
+            <img id="toggle-password-icon" class="toggle-password"
+            onclick="togglePasswordVisibility('password',
+            'toggle-password-icon')"
+            src="https://cdn-icons-png.flaticon.com/512/709/709612.png" /* eye
+            icon */ alt="Show/Hide password" width="24px" />
+          </div>
+        </div>
+
+        <button type="submit">Login</button>
+      </form>
+
+      <div class="forgot-password">
+        <p><a href="forgot_password.php">Forgot Password?</a></p>
+      </div>
+
+      <div class="signup-link">
+        <p>Don't have an account? <a href="signup.html">Signup</a></p>
+      </div>
+    </div>
+  </body>
+</html>
+=========================================================================================
+teacher_login.php
+----------
+<?php
+session_name('teacher_session'); // Unique session for students
+session_start();
+
+// Database connection
+$dbhost = "localhost";
+$dbname = "postgres";
+$dbuser = "postgres";
+$dbpass = "Shreya@1410";
+$port = 5432;
+
+$conn = pg_connect("host=$dbhost dbname=$dbname user=$dbuser password=$dbpass port=$port");
+if (!$conn) {
+    die("Database connection failed.");
+}
+
+// Handle POST request
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $email = pg_escape_string($conn, $_POST['email']);
+    $password = $_POST['password']; // Password should not be escaped for verification
+
+    // Check if the user exists and is a student
+    $query = "SELECT * FROM users WHERE email = '$email' AND role = 'teacher'";
+    $result = pg_query($conn, $query);
+
+    if (pg_num_rows($result) > 0) {
+        $user = pg_fetch_assoc($result);
+
+        if (password_verify($password, $user['password'])) {
+            // Fetch student details from student table
+            $user_id = $user['user_id'];
+            $teacher_query = "SELECT * FROM teacher WHERE user_id = '$user_id'";
+            $teacher_result = pg_query($conn, $teacher_query);
+
+            if (pg_num_rows($teacher_result) > 0) {
+                $teacher = pg_fetch_assoc($teacher_result);
+
+                // Store session variables
+                $_SESSION['teacher_id'] = $teacher['teacher_id'];
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['teacher_name'] = trim($user['name']);
+                $_SESSION['role'] = 'teacher';
+
+                header("Location: teacher_dashboard.php"); // Redirect after successful login
+                exit();
+            } else {
+                echo "<script>alert('Teacher details not found.'); window.location.href = 'teacher_login.html';</script>";
+            }
+        } else {
+            echo "<script>alert('Incorrect password'); window.location.href = 'teacher_login.html';</script>";
+        }
+    } else {
+        echo "<script>alert('Email not found or not a student'); window.location.href = 'teacher_login.html';</script>";
+    }
+}
+?>
+=======================================================================================
+update_password.php
+----------
+<?php
+session_start();
+
+$host = 'localhost';
+$name = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+
+$conn = pg_connect("host=$host dbname=$name user=$username password=$password port=$port");
+
+if (!$conn) {
+    die("Error: Unable to connect to the database.");
+}
+
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $new_password = pg_escape_string($_POST['new_password']);
+    $confirm_password = pg_escape_string($_POST['confirm_password']);
+    $email = $_SESSION['email'];
+
+    if ($new_password == $confirm_password) {
+        // Update password in the database
+        $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+        $query = "UPDATE users SET password = '$hashed_password' WHERE email = '$email'";
+        $result = pg_query($conn, $query);
+
+        if ($result) {
+            echo "<script>alert('Password updated successfully!'); window.location.href = 'login.html';</script>";
+        } else {
+            echo "<script>alert('Error updating password. Please try again.'); window.location.href = 'reset_password.php';</script>";
+        }
+    } else {
+        echo "<script>alert('Passwords do not match. Please try again.'); window.location.href = 'reset_password.php';</script>";
+    }
+}
+?>
+=========================================================================================
+verify_otp.php
+----------
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verify OTP</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+    rel="stylesheet"
+  />
+  <style>
+    body {
+      font-family: "Montserrat", sans-serif;
+      background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+        linear-gradient(120deg, #89f7fe, #66a6ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .container {
+      width: 90%;
+      max-width: 600px;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      padding: 30px;
+      text-align: center;
+    }
+    h2 {
+      font-size: 2.5em;
+      color: #333;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 15px;
+      color: #333;
+      display: block;
+      text-align: left;
+    }
+    input,
+    button {
+      width: 100%;
+      padding: 10px;
+      border: none;
+      border-radius: 8px;
+      margin-top: 5px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    input {
+      background: #f4f4f4;
+      color: #333;
+    }
+    button {
+      background: #6c63ff;
+      color: #fff;
+      font-size: 18px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #5753c9;
+    }
+    .toggle-link {
+      cursor: pointer;
+      color: #6c63ff;
+      font-size: 14px;
+      text-decoration: underline;
+    }
+    p {
+      margin-top: 20px;
+    }
+  </style>
+  <script>
+    function startTimer(duration, display) {
+      var timer = duration, minutes, seconds;
+      var interval = setInterval(function () {
+        minutes = parseInt(timer / 60, 10);
+        seconds = parseInt(timer % 60, 10);
+
+        minutes = minutes < 10 ? "0" + minutes : minutes;
+        seconds = seconds < 10 ? "0" + seconds : seconds;
+
+        display.textContent = minutes + ":" + seconds;
+
+        if (--timer < 0) {
+          clearInterval(interval);
+          alert("OTP has expired! Please request a new OTP.");
+          window.location.href = "forget_password.html";
+        }
+      }, 1000);
+    }
+
+    window.onload = function () {
+      var fiveMinutes = 60 * 5; // 5 minutes in seconds
+      var display = document.querySelector('#timer');
+      startTimer(fiveMinutes, display);
+    };
+  </script>
+</head>
+<body>
+  <div class="container">
+    <h2>Verify OTP</h2>
+    <p>OTP expires in <span id="timer">05:00</span></p>
+    <form action="check_otp.php" method="POST">
+      <label for="otp">Enter OTP:</label>
+      <input type="text" id="otp" name="otp" required>
+      <button type="submit">Submit</button>
+    </form>
+  </div>
+</body>
+</html>
+==================================================================================
+view_attachment.php
+----------
+<?php
+if (!isset($_GET['file'])) {
+    echo "<script>alert('No attachment found.'); window.location.href = 'student_dashboard.php';</script>";
+    exit;
+}
+
+$file = htmlspecialchars($_GET['file']);
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>View Attachment</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .header {
+            background-color: #333;
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header a {
+            color: white;
+            text-decoration: none;
+            font-size: 24px;
+        }
+        .attachment {
+            width: 100%;
+            height: calc(100vh - 50px);
+            border: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1>Attachment</h1>
+        <a href="student_dashboard.php">&times;</a>
+    </div>
+
+    <iframe class="attachment" src="uploads/<?php echo $file; ?>" frameborder="0"></iframe>
+
+</body>
+</html>
+========================================================================================
+view_notice.php
+-----------
+<?php
+session_start();
+
+// Check if user is logged in
+if (!isset($_SESSION['role'])) {
+    header("Location: login.php");
+    exit;
+}
+
+// Database connection
+$host = 'localhost';
+$dbname = 'postgres';
+$username = 'postgres';
+$password = 'Shreya@1410';
+$port = 5432;
+
+$conn = pg_connect("host=$host dbname=$dbname user=$username password=$password port=$port");
+
+if (!$conn) {
+    die("Database connection failed: " . pg_last_error());
+}
+
+// Determine user role and fetch department
+$user_role = $_SESSION['role'];
+$department = '';
+
+if ($user_role === 'student') {
+    $query = "SELECT student_department FROM student WHERE user_id = $1";
+} elseif ($user_role === 'teacher') {
+    $query = "SELECT teacher_department FROM teacher WHERE user_id = $1";
+} elseif ($user_role === 'admin') {
+    $query = "SELECT admin_department FROM admin WHERE user_id = $1";
+}
+
+if (!empty($query)) {
+    $result = pg_query_params($conn, $query, [$_SESSION['user_id']]);
+    if ($result && pg_num_rows($result) > 0) {
+        $department = pg_fetch_result($result, 0, 0);
+    }
+}
+
+// Fetch notices
+if ($user_role === 'admin') {
+    $query = "SELECT notice.*, category.name AS category_name, category.color_code AS category_color 
+              FROM notice 
+              LEFT JOIN category ON notice.category_id = category.id 
+              WHERE status = 'approved' 
+              ORDER BY date DESC";
+    $result = pg_query($conn, $query);
+} else {
+    $query = "SELECT notice.*, category.name AS category_name, category.color_code AS category_color 
+              FROM notice 
+              LEFT JOIN category ON notice.category_id = category.id 
+              WHERE status = 'approved' 
+              AND (department ILIKE 'General' OR department ILIKE $1)
+              ORDER BY date DESC";
+    $result = pg_query_params($conn, $query, [$department]);
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>View Notices</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            text-align: center;
+        }
+        .notice-card {
+            background-color: white;
+            padding: 15px;
+            margin: 10px;
+            border-radius: 8px;
+            box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 15px;
+            border: none;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Notices</h2>
+    <?php while ($row = pg_fetch_assoc($result)) { ?>
+        <div class="notice-card" style="background-color: <?php echo htmlspecialchars($row['category_color']); ?>;">
+            <p><strong>Title:</strong> <?php echo htmlspecialchars($row['title']); ?></p>
+            <p><strong>Description:</strong> <?php echo htmlspecialchars($row['description']); ?></p>
+            <p><strong>Category:</strong> <?php echo htmlspecialchars($row['category_name']); ?></p>
+        </div>
+    <?php } ?>
+</body>
+</html>
+=========================================================================================

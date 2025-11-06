@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Online Notice Board</title>
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #89f7fe, #66a6ff);
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 30px;
+        background: rgba(255, 255, 255, 0.8);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      }
+      header nav {
+        display: flex;
+        gap: 15px;
+      }
+      header .login {
+        display: flex;
+        align-items: center;
+      }
+      header select {
+        padding: 15px;
+        font-size: 18px; /* Increased font size */
+        border-radius: 8px;
+        border: none;
+        background: #f4f4f4;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        cursor: pointer;
+      }
+      main {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 30px;
+      }
+      .content {
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+      }
+      h2 {
+        font-size: 2.5em;
+        color: #333;
+        margin-bottom: 10px;
+      }
+      p {
+        font-size: 1.2em;
+        color: #666;
+      }
+      footer {
+        text-align: center;
+        background-color: black;
+        color: white;
+        padding: 10px 0;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <nav>
+        <a href="about.html">About Us</a>
+        <a href="contact.html">Contact Us</a>
+      </nav>
+      <div class="login">
+        <label for="role">Login as:</label>
+        <select id="role" onchange="navigateToLogin()">
+          <option value="" disabled selected>Select</option>
+          <option value="student">Student</option>
+          <option value="teacher">Teacher</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+    </header>
+
+    <main>
+      <div class="content">
+        <h2>Online Notice Board</h2>
+        <p>Stay updated with the latest academic and event notices.</p>
+      </div>
+    </main>
+
+    <footer>
+      <p>© 2025 Online Notice Board. All rights reserved.</p>
+      <p>Created by SSP</p>
+    </footer>
+
+    <script>
+      function navigateToLogin() {
+        const role = document.getElementById("role").value;
+        if (role === "student") {
+          window.location.href = "student_login.html";
+        } else if (role === "teacher") {
+          window.location.href = "teacher_login.html";
+        } else if (role === "admin") {
+          window.location.href = "admin_login.html";
+        }
+      }
+    </script>
+  </body>
+</html>

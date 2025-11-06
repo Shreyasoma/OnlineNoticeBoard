@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login Page</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      body {
+        font-family: "Montserrat", sans-serif;
+        background: url("https://www.transparenttextures.com/patterns/diamond-upholstery-dark.png"),
+          linear-gradient(120deg, #89f7fe, #66a6ff);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        margin: 0;
+      }
+      .container {
+        width: 90%;
+        max-width: 600px;
+        background: #ffffff;
+        border-radius: 12px;
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        text-align: center;
+      }
+      h2 {
+        font-size: 2.5em;
+        color: #333;
+      }
+      label {
+        font-weight: bold;
+        margin-top: 15px;
+        color: #333;
+        display: block;
+        text-align: left;
+      }
+      .input-container {
+        margin-top: 10px;
+        text-align: left;
+      }
+      input,
+      button {
+        width: 100%;
+        padding: 10px;
+        border: none;
+        border-radius: 8px;
+        margin-top: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      input {
+        background: #f4f4f4;
+        color: #333;
+      }
+      button {
+        background: #6c63ff;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      button:hover {
+        background: #5753c9;
+      }
+      .password-wrapper {
+        position: relative;
+      }
+      .password-wrapper input {
+        padding-right: 10px; /* Reduce padding-right to match email input size */
+      }
+      .toggle-password {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        color: #6c63ff;
+      }
+      .forgot-password,
+      .signup-link {
+        margin-top: 20px;
+      }
+      .forgot-password a,
+      .signup-link a {
+        color: #6c63ff;
+        text-decoration: none;
+      }
+      .forgot-password a:hover,
+      .signup-link a:hover {
+        text-decoration: underline;
+      }
+    </style>
+    <script>
+      function togglePasswordVisibility(id, toggleIconId) {
+        const passwordField = document.getElementById(id);
+        const toggleIcon = document.getElementById(toggleIconId);
+        if (passwordField.type === "password") {
+          passwordField.type = "text";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/565/565655.png"; // eye-off icon
+        } else {
+          passwordField.type = "password";
+          toggleIcon.src =
+            "https://cdn-icons-png.flaticon.com/512/709/709612.png"; // eye icon
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div class="container">
+      <h2>Admin Login</h2>
+      <form action="admin_login.php" method="POST">
+        <div class="input-container">
+          <label for="email">Email</label>
+          <input
+            type="email"
+            id="email"
+            name="email"
+            autocomplete="off"
+            placeholder="Enter your email"
+            required
+          />
+        </div>
+
+        <div class="input-container">
+          <label for="password">Password</label>
+          <div class="password-wrapper">
+            <input
+              type="password"
+              id="password"
+              name="password"
+              placeholder="Enter your password"
+              required
+            />
+            <img id="toggle-password-icon" class="toggle-password"
+            onclick="togglePasswordVisibility('password',
+            'toggle-password-icon')"
+            src="https://cdn-icons-png.flaticon.com/512/709/709612.png" /* eye
+            icon */ alt="Show/Hide password" width="24px" />
+          </div>
+        </div>
+
+        <button type="submit">Login</button>
+      </form>
+
+      <div class="forgot-password">
+        <p><a href="forgot_password.php">Forgot Password?</a></p>
+      </div>
+
+      <div class="signup-link">
+        <p>Don't have an account? <a href="signup.html">Signup</a></p>
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,7 @@
+general:
+    wayland support
+    properties all the way (when GProperty stuff lands)
+libgpaste-client:
+    specify errors types when possible in g-i
+tests:
+    split test, add interactive wrapper
