@@ -97,9 +97,9 @@ Open your browser and go to:
 http://localhost/OnlineNoticeBoard
 
 
-🌐 Live Demo (if hosted)
-🚀 Live Project: https://online-notice-board.onrender.com
-🗂️ GitHub Repository: https://github.com/<your-username>/OnlineNoticeBoard
+🌐 Live Demo:
+🗂️ GitHub Repository: https://github.com/Shreyasoma/OnlineNoticeBoard)
+🚀 Live Project: https://onlinenoticeboard.onrender.com/
 
 
 🧑‍💻 Author
