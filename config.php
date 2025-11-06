@@ -1,16 +1,15 @@
 <?php
-$url = getenv('DATABASE_URL'); // Render provides it automatically
-$db = parse_url($url);
+$host = "dpg-d46a93chg0os73eeqdt0-a.oregon-postgres.render.com";
+$dbname = "online_noticeboard_db";
+$user = "online_noticeboard_db_user";
+$password = "9RwGmBUS7wkhBWU3XG8MBqOybxzOrGkt";
+$port = "5432";
 
-$host = $db["host"];
-$port = $db["port"];
-$user = $db["user"];
-$pass = $db["pass"];
-$dbname = ltrim($db["path"], "/");
-
-$conn = pg_connect("host=$host port=$port dbname=$dbname user=$user password=$pass");
-
-if (!$conn) {
-    die("Connection failed: " . pg_last_error());
+try {
+    $conn = new PDO("pgsql:host=$host;port=$port;dbname=$dbname;", $user, $password);
+    $conn->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // echo "Connected successfully"; // optional test line
+} catch (PDOException $e) {
+    echo "Connection failed: " . $e->getMessage();
 }
 ?>
