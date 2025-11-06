@@ -1,12 +1,16 @@
 <?php
-$dbhost = "localhost";
-$dbname = "postgres";
-$dbuser = "postgres";
-$dbpass = "Shreya@1410";
-$port = 5432;
+$url = getenv('DATABASE_URL'); // Render provides it automatically
+$db = parse_url($url);
 
-$conn = pg_connect("host=$dbhost dbname=$dbname user=$dbuser password=$dbpass port=$port");
+$host = $db["host"];
+$port = $db["port"];
+$user = $db["user"];
+$pass = $db["pass"];
+$dbname = ltrim($db["path"], "/");
+
+$conn = pg_connect("host=$host port=$port dbname=$dbname user=$user password=$pass");
+
 if (!$conn) {
-    die("Database connection failed.");
+    die("Connection failed: " . pg_last_error());
 }
 ?>
