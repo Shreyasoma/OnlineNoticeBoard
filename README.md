@@ -61,7 +61,11 @@ It replaces the traditional paper-based notice boards with an easy-to-use, secur
 
 ## 🖥️ Screenshots
 
-| Login Page | Dashboard | Notice View |
+HomePage | Student Login Page | Student Dashboard | 
+<img width="1366" height="681" alt="image" src="https://github.com/user-attachments/assets/f2f5c048-2ace-4832-97f9-4c5d545f7d41" />
+<img width="1366" height="685" alt="image" src="https://github.com/user-attachments/assets/2c583f7d-e1c0-4dd2-943a-f7e6bd3beba7" />
+<img width="1366" height="688" alt="image" src="https://github.com/user-attachments/assets/12ff86cd-e7c3-4c91-9ed2-489c6e275048" />
+
 
 ---
 
